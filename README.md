@@ -73,6 +73,7 @@ In some cases additional fields are provided:
 
 * `cluster` is replaced by the actual cluster object as returned by the API,
   instead of just the id/name.
+* all `id` and `url` sub-keys are removed to de-clutter the list.
 
 ## Acknowledgements
 

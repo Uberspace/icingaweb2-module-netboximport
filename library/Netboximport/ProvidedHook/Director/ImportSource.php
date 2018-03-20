@@ -13,6 +13,11 @@ class ImportSource extends ImportSourceHook {
         "cluster",
     ];
 
+    private static function endsWith($haystack, $needle) {
+        $length = strlen($needle);
+        return $length === 0 || (substr($haystack, -$length) === $needle);
+    }
+
     // stolen from https://stackoverflow.com/a/9546235/2486196
     // adapted to also flatten nested stdClass objects
     function flattenNestedArray($prefix, $array, $delimiter="__") {
@@ -47,7 +52,16 @@ class ImportSource extends ImportSourceHook {
                 }
             }
 
-            return (object) $this->flattenNestedArray('', $o);
+            $o = $this->flattenNestedArray('', $o);
+
+            $o = array_filter($o, function ($key) {
+                return
+                    !$this->endsWith($key, '__id') &&
+                    !$this->endsWith($key, '__url')
+                ;
+            }, ARRAY_FILTER_USE_KEY);
+
+            return (object) $o;
         }, $objs);
 
         return $objs;
