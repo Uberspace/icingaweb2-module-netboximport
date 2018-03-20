@@ -3,7 +3,15 @@
 Import devices and virtual machines from [netbox](https://github.com/digitalocean/netbox)
 into icinga2 to monitor them.
 
-## Confiugration
+## Installation
+
+```shell
+$ cd /usr/share/icingaweb2/modules
+$ git clone https://github.com/Uberspace/icingaweb2-module-netboximport.git netboximport
+$ icingacli module enable netboximport
+```
+
+## Configuration
 
 All configuration is done in the web interface under the "Automation" tab of
 icinga2 director.
