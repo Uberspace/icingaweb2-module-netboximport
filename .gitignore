@@ -1,0 +1,17 @@
+### PHP ####
+vendor
+
+### Vim ###
+# swap
+.sw[a-p]
+.*.sw[a-p]
+# session
+Session.vim
+# temporary
+.netrwhist
+*~
+
+### VisualStudioCode ###
+.vscode/*
+.history
+*.save
