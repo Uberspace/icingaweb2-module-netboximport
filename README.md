@@ -1,12 +1,12 @@
 # Icinga Web 2 Netbox Import
 
-Import hostnames and metadata of netbox devices and virtual
-machines into icinga2 to monitor them.
+Import devices and virtual machines from [netbox](https://github.com/digitalocean/netbox)
+into icinga2 to monitor them.
 
 ## Confiugration
 
-All configuration is done in the web interface under the
-"Automation" tab of icinga2 director.
+All configuration is done in the web interface under the "Automation" tab of
+icinga2 director.
 
 1. add an "Import source"
   * Key column name: `name`
@@ -61,9 +61,10 @@ A list of all possible fields can be seen in the "Preview" of your Import Source
 in your Sync Rule while adding a new property or in your API itself: https://netbox.company.com/api/dcim/devices/,
 https://netbox.company.com/api/virtualization/virtual-machines/.
 
-In some cases additional fields are provides:
+In some cases additional fields are provided:
 
-* the `cluster` value is replaced by the actual cluster object as returned by the API, instead of just the id/name.
+* `cluster` is replaced by the actual cluster object as returned by the API,
+  instead of just the id/name.
 
 ## Acknowledgements
 
