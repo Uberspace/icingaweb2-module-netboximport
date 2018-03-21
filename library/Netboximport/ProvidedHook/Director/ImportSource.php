@@ -108,11 +108,11 @@ class ImportSource extends ImportSourceHook {
 
         $objects = [];
 
-        if($this->getSetting('importdevices')) {
+        if($this->getSetting('importdevices') === 'y') {
             $objects[] = $this->fetchObjects('dcim/devices', $activeonly);
         }
 
-        if($this->getSetting('importvirtualmachines')) {
+        if($this->getSetting('importvirtualmachines') === 'y') {
             $objects[] = $this->fetchObjects('virtualization/virtual-machines', $activeonly);
         }
 
