@@ -14,17 +14,22 @@ $ icingacli module enable netboximport
 ## Configuration
 
 All configuration is done in the web interface under the "Automation" tab of
-icinga2 director.
+icinga2 director. Please read to the [official documentation](https://www.icinga.com/docs/director/latest/doc/70-Import-and-Sync/)
+before configuring a netbox import.
 
-1. add an "Import source"
-  * Key column name: `name`
+1. add an "Import Source"
+  * Key column name: `name` (the hostname)
   * fill out all other required files according to the tooltips shown
-2. add a "Sync rule"
+2. test the Import source via the "Check for changes" button, "Preview" tab and finally "Trigger Import Run"
+3. add a "Sync Rule"
   * Object Type: "Host"
-3. add the desired Properties to the rule
+  * by default will import _all_ objects present in netbox. You can tailor this by setting "Filter".
+    For example, only import objects, which have a certain field set: `custom_fields__icinga2_host_template__label>0`.
+4. add the desired Properties to the rule
   * setting `object_name`, `address` and `address6` to `name` is generally desireable
-4. add an import job
-5. add an sync job
+5. test the Sync Rule via the "Check for changes" and finally "Trigger this Sync" buttons.
+6. add an import job to run the import regularly
+7. add an sync job to run the sync regularly
 
 ## Data Format
 
