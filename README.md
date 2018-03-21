@@ -39,10 +39,10 @@ first:
   "display_name": "3c09",
   "device_type": {
       "id": 19,
-      "url": "https://netbox.company.com/api/dcim/device-types/19/",
+      "url": "https://netbox.example.com/api/dcim/device-types/19/",
       "manufacturer": {
           "id": 12,
-          "url": "https://netbox.company.com/api/dcim/manufacturers/12/",
+          "url": "https://netbox.example.com/api/dcim/manufacturers/12/",
           "name": "3COM",
           "slug": "3com"
       },
@@ -59,15 +59,15 @@ id: 39
 name: 3c09
 display_name: 3c09
 device_type__id: 19
-device_type__url: https://netbox.company.com/api/dcim/device-types/19/
+device_type__url: https://netbox.example.com/api/dcim/device-types/19/
 device_type__manufacturer__id: 12
-device_type__manufacturer__url: https://netbox.company.com/api/dcim/manufacturers/12/
+device_type__manufacturer__url: https://netbox.example.com/api/dcim/manufacturers/12/
 ...
 ```
 
 A list of all possible fields can be seen in the "Preview" of your Import Source,
-in your Sync Rule while adding a new property or in your API itself: https://netbox.company.com/api/dcim/devices/,
-https://netbox.company.com/api/virtualization/virtual-machines/.
+in your Sync Rule while adding a new property or in your API itself: https://netbox.example.com/api/dcim/devices/,
+https://netbox.example.com/api/virtualization/virtual-machines/.
 
 In some cases additional fields are provided:
 

@@ -72,7 +72,7 @@ class ImportSource extends ImportSourceHook {
             'label'       => $form->translate('Base URL'),
             'required'    => true,
             'description' => $form->translate(
-                'API url for your instance, e.g. https://netbox.company.com/api'
+                'API url for your instance, e.g. https://netbox.example.com/api'
             )
         ));
 
@@ -80,7 +80,7 @@ class ImportSource extends ImportSourceHook {
             'label'       => $form->translate('API-Token'),
             'required'    => true,
             'description' => $form->translate(
-                '(readonly) API token. See https://netbox.company.com/user/api-tokens/'
+                '(readonly) API token. See https://netbox.example.com/user/api-tokens/'
             )
         ));
 
