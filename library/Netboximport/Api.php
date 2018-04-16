@@ -53,7 +53,7 @@ class Api {
                 return $response; // single
             }
         } else {
-            throw new Exception("Netbox API request failed: status=$status, error=$curlerror");
+            throw new \Exception("Netbox API request failed: status=$status, error=$curlerror");
         }
     }
 
