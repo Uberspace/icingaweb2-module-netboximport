@@ -103,7 +103,7 @@ class ImportSource extends ImportSourceHook {
     public function fetchData() {
         $baseurl = $this->getSetting('baseurl');
         $apitoken = $this->getSetting('apitoken');
-        $activeonly = $this->getSetting('activeonly');
+        $activeonly = $this->getSetting('activeonly') === 'y';
         $this->api = new Api($baseurl, $apitoken);
 
         $objects = [];
