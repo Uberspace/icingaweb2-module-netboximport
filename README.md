@@ -78,6 +78,7 @@ In some cases additional fields are provided:
 
 * `cluster` is replaced by the actual cluster object as returned by the API,
   instead of just the id/name.
+* `interfaces` is added, so configured IP addresses can be reused in icinga
 * all `id` and `url` sub-keys are removed to de-clutter the list.
 
 ## Acknowledgements
