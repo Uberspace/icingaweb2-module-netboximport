@@ -26,7 +26,7 @@ class Api {
         $get_params['limit'] = 1000000;
 
         $query = http_build_query($get_params);
-        curl_setopt($ch, CURLOPT_URL, $this->baseurl . ltrim($url, '/') . '?' . $query);
+        curl_setopt($ch, CURLOPT_URL, $this->baseurl . trim($url, '/') . '/?' . $query);
 
         curl_setopt($ch, CURLOPT_HTTPHEADER, array(
             'Authorization: Token ' . $this->apitoken,
