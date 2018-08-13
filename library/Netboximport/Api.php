@@ -16,6 +16,10 @@ class Api {
     private function apiRequest($method, $url, $get_params) {
         if ($this->startsWith($url, $this->baseurl)) {
             $url = substr($url, strlen($this->baseurl));
+        } else if ($this->startsWith(preg_replace("/^http:/i", "https:", $url), $this->baseurl)) {
+            $url = substr($url, strlen($this->baseurl)-1);
+        } else if ($this->startsWith(preg_replace("/^https:/i", "http:", $url), $this->baseurl)) {
+            $url = substr($url, strlen($this->baseurl)+1);
         }
 
         $ch = curl_init();
