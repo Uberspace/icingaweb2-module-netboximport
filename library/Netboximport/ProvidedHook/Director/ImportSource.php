@@ -70,17 +70,17 @@ class ImportSource extends ImportSourceHook
 
             // Remove inactive elements from the working list (if requested)
             $working_list = array_filter($working_list, function ($o) use ($activeOnly) {
-                if($activeOnly) {
-                  if(@$o->status->value === 1 && @$o->name !== null) {
-                    // Keep eleemnts that are active and have a name
-                    return true;
-                  } else {
-                    // Delete elements that are inactive or unnamed
-                    return false;
-                  }
+                if ($activeOnly) {
+                    if (@$o->status->value === 1 && @$o->name !== null) {
+                        // Keep eleemnts that are active and have a name
+                        return true;
+                    } else {
+                        // Delete elements that are inactive or unnamed
+                        return false;
+                    }
                 } else {
-                  // Keep all elements
-                  return true;
+                    // Keep all elements
+                    return true;
                 }
 
                 // if ($activeOnly || @$o->status->value === 1) {
@@ -117,15 +117,15 @@ class ImportSource extends ImportSourceHook
 
                 // Filter out keys that end with __id or __url
                 $o = array_filter($o, function ($key) {
-                  //   return
-                  //     !$this->endsWith($key, '__id') &&
-                  //     !$this->endsWith($key, '__url')
-                  // ;
-                  if(preg_match("/__id$/", $key) || preg_match("/__url$/", $key)) {
-                    return false;
-                  } else {
-                    return true;
-                  }
+                    //   return
+                    //     !$this->endsWith($key, '__id') &&
+                    //     !$this->endsWith($key, '__url')
+                    // ;
+                    if (preg_match("/__id$/", $key) || preg_match("/__url$/", $key)) {
+                        return false;
+                    } else {
+                        return true;
+                    }
                 }, ARRAY_FILTER_USE_KEY);
 
                 // return the typecasted object

@@ -60,7 +60,7 @@ class Api
 
         // Return empty object if path is blank
         if (trim($url_path, '/') === '') {
-          return [];
+            return [];
         }
 
         // Strip '/api' since it's included in $this->baseurl
@@ -85,7 +85,7 @@ class Api
             $response = json_decode($response);
 
             return $response;
-            // if (!isset($response->results)) { // single object
+        // if (!isset($response->results)) { // single object
             //     return $response;
             // } elseif (isset($response->next)) { // paginated results
             //     // more results
@@ -120,12 +120,11 @@ class Api
         //     return $this->cache[$cache_key];
         // }
 
-        if($follow_pagination === true) {
-          // loop over resource until "next" field is null
-          $data = $this->apiGet($resource);
-
+        if ($follow_pagination === true) {
+            // loop over resource until "next" field is null
+            $data = $this->apiGet($resource);
         } else {
-          $data = $this->apiGet($resource);
+            $data = $this->apiGet($resource);
         }
 
         // $this->cache[$cache_key] = $data;
