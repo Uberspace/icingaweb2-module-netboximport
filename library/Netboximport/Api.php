@@ -31,7 +31,8 @@ class Api
         return $ch;
     }
 
-    private function apiRequest($method, $url, $get_params, $ch = null)
+    // private function apiRequest($method, $url, $get_params, $ch = null)
+    private function apiGet($url, $get_params = [], $ch = null)
     {
         // if ($this->startsWith($url, $this->baseurl)) {
         //     $url = substr($url, strlen($this->baseurl));
@@ -57,8 +58,13 @@ class Api
 
         $url_path = parse_url($url, PHP_URL_PATH);
 
+        // Return empty object if path is blank
+        if (trim($url_path, '/') === '') {
+          return [];
+        }
+
         // Strip '/api' since it's included in $this->baseurl
-        $url_path = preg_replace("|^/api/|", "/", $url_path);
+        $url_path = preg_replace("#^/api/#", "/", $url_path);
 
         // This is limited by MAX_PAGE_SIZE (https://netbox.readthedocs.io/en/stable/configuration/optional-settings/#max_page_size)
         $get_params['limit'] = 1001;
@@ -78,19 +84,20 @@ class Api
         if ($curlerror === '' && $status === 200) {
             $response = json_decode($response);
 
-            if (!isset($response->results)) { // single object
-                return $response;
-            } elseif (isset($response->next)) { // paginated results
-                // more results
-                // array_merge($response->results, apiRequest($method, $url, $get_params, $ch)); // recursion
-                $all_results = array_merge(
-                $response->results,
-                $this->apiRequest($method, $response->next, $get_params, $ch)
-              );
-                return $all_results;
-            } elseif (!isset($response->next)) { // end of pagination or single page
-                return $response->results;
-            }
+            return $response;
+            // if (!isset($response->results)) { // single object
+            //     return $response;
+            // } elseif (isset($response->next)) { // paginated results
+            //     // more results
+            //     // array_merge($response->results, apiRequest($method, $url, $get_params, $ch)); // recursion
+            //     $all_results = array_merge(
+            //     $response->results,
+            //     $this->apiGet($response->next, $get_params, $ch)
+            //   );
+            //     return $all_results;
+            // } elseif (!isset($response->next)) { // end of pagination or single page
+            //     return $response->results;
+            // }
 
             // if(isset($response->results)) {
             //     return $response->results; // collection
@@ -102,16 +109,26 @@ class Api
         }
     }
 
-    public function g($resource, $filter=array(), $cache=true)
+    // Query API for resource passed
+    //    $resource(String) - API Path
+    // public function getResource($resource, $filter=array(), $cache=true)
+    public function getResource($resource, $follow_pagination = false)
     {
-        $cache_key = sha1($resource . json_encode($filter));
+        // $cache_key = sha1($resource . json_encode($filter));
+        //
+        // if (isset($this->cache[$cache_key])) {
+        //     return $this->cache[$cache_key];
+        // }
 
-        if (isset($this->cache[$cache_key])) {
-            return $this->cache[$cache_key];
+        if($follow_pagination === true) {
+          // loop over resource until "next" field is null
+          $data = $this->apiGet($resource);
+
+        } else {
+          $data = $this->apiGet($resource);
         }
 
-        $data = $this->apiRequest('GET', $resource, $filter);
-        $this->cache[$cache_key] = $data;
+        // $this->cache[$cache_key] = $data;
 
         return $data;
     }
