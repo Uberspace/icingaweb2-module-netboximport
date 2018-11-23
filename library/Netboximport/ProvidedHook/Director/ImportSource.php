@@ -27,6 +27,10 @@ class ImportSource extends ImportSourceHook {
             if (is_object($value))
                 $value = get_object_vars($value);
 
+           if (is_array($value) && ($key == "local_context_data")) {
+               $result[$key] = json_encode($value);
+               continue;
+           }
             if (is_array($value))
                 $result = array_merge($result, $this->flattenNestedArray($prefix . $key . $delimiter, $value, $delimiter));
             else
