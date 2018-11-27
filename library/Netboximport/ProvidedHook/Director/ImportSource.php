@@ -19,22 +19,19 @@ class ImportSource extends ImportSourceHook {
     }
 
     // stolen from https://stackoverflow.com/a/9546235/2486196
-    // adapted to also flatten nested stdClass objects
-    function flattenNestedArray($prefix, $array, $delimiter="__") {
+    function flattenArray($prefix, $array) {
         $result = [];
 
         foreach ($array as $key => $value) {
             if (is_object($value))
                 $value = get_object_vars($value);
 
-           if (is_array($value) && ($key == "local_context_data")) {
-               $result[$key] = json_encode($value);
+           if (is_array($value)) {
+               $result[$key] = $value;
                continue;
            }
-            if (is_array($value))
-                $result = array_merge($result, $this->flattenNestedArray($prefix . $key . $delimiter, $value, $delimiter));
-            else
-                $result[$prefix . $key] = $value;
+
+          $result[$prefix . $key] = $value;
         }
 
         return $result;
@@ -42,6 +39,8 @@ class ImportSource extends ImportSourceHook {
 
     private function fetchObjects($ressource, $activeOnly, $additionalKeysCallback = null) {
         $objs = $this->api->g($ressource);
+
+       //Filter only active objects if setting is set
         $objs = array_filter($objs, function ($o) use ($activeOnly) {
             return
               (!$activeOnly || @$o->status->value === 1)
@@ -49,26 +48,29 @@ class ImportSource extends ImportSourceHook {
             ;
         });
 
+
         $objs = array_map(function ($o) use ($additionalKeysCallback) {
+           //Resolve additional properties
             foreach ($this->resolve_properties as $prop) {
                 if (@$o->$prop !== null) {
                     $o->$prop = $this->api->g($o->$prop->url);
                 }
             }
 
-            $o = $this->flattenNestedArray('', $o);
+            $o = $this->flattenArray('', $o);
 
             if(is_callable($additionalKeysCallback)) {
                 $keys = $additionalKeysCallback($o['id']);
+
                 $o = array_merge($o, $keys);
             }
 
-            $o = array_filter($o, function ($key) {
+/*            $o = array_filter($o, function ($key) {
                 return
                     !$this->endsWith($key, '__id') &&
                     !$this->endsWith($key, '__url')
                 ;
-            }, ARRAY_FILTER_USE_KEY);
+            }, ARRAY_FILTER_USE_KEY);*/
 
             return (object) $o;
         }, $objs);
@@ -78,11 +80,50 @@ class ImportSource extends ImportSourceHook {
 
     private function fetchHosts($url, $type, $activeonly) {
         $hosts = $this->fetchObjects($url, $activeonly, function ($id) use ($type) {
-            return $this->flattenNestedArray('', [
-                'interfaces' => $this->interfaces[$type][$id] ?? []
+
+            $children =  $this->flattenArray('', [
+                'interfaces' => $this->interfaces[$type][$id] ?? [],
+                'services' => $this->services[$type][$id] ?? []
             ]);
+
+           return $children;
         });
         return $hosts;
+    }
+
+    private function fetchServices($allowedServiceElements) {
+        $services = $this->api->g('ipam/services');
+
+        $owners = [
+            'device' => [],
+            'virtual_machine' => [],
+        ];
+        $owner_types = array_keys($owners);
+
+        foreach($services as $service) {
+            $servicename = strtolower($service->name);
+
+            foreach($owner_types as $ot) {
+                if ($service->$ot) {
+                    $owner_type = $ot;
+                    $owner_id = $service->$ot->id;
+                    break;
+                }
+            }
+
+            if(!array_key_exists($owner_id,$owners[$owner_type])) {
+              $owners[$owner_type][$owner_id] = array();
+            }
+
+           $service = array_filter((array) $service, function($key) use ($allowedServiceElements) {
+                        return in_array($key, $allowedServiceElements);
+                }, ARRAY_FILTER_USE_KEY
+            );
+
+            array_push($owners[$owner_type][$owner_id], (array) $service);
+        }
+
+        return $owners;
     }
 
     private function fetchInterfaces() {
@@ -124,6 +165,7 @@ class ImportSource extends ImportSourceHook {
                     )
                 ]
             );
+
         }
 
         return $owners;
@@ -160,6 +202,12 @@ class ImportSource extends ImportSourceHook {
             'label'       => $form->translate('Import active objects only'),
             'description' => $form->translate('only load objects with status "active" (as opposed to "planned" or "offline")'),
         ));
+
+       $form->addElement('text','serviceelements', array(
+            'label'       => $form->translate('Services Elements'),
+            'description' => $form->translate('which elements of Services should be imported (comma seperated)'),
+           'value'       => 'name,port,protocol,ipaddresses,description,custom_fields',
+        ));
     }
 
     public function fetchData() {
@@ -167,8 +215,11 @@ class ImportSource extends ImportSourceHook {
         $apitoken = $this->getSetting('apitoken');
         $activeonly = $this->getSetting('activeonly') === 'y';
 
+        $service_elements = explode(",",$this->getSetting('serviceelements'));
+
         $this->api = new Api($baseurl, $apitoken);
         $this->interfaces = $this->fetchInterfaces();
+        $this->services = $this->fetchServices($service_elements);
 
         $objects = [];
 
@@ -177,7 +228,7 @@ class ImportSource extends ImportSourceHook {
         }
 
         if($this->getSetting('importvirtualmachines') === 'y') {
-            $objects[] = $this->fetchHosts('virtualization/virtual-machines', 'virtual-machine', $activeonly);
+            $objects[] = $this->fetchHosts('virtualization/virtual-machines', 'virtual_machine', $activeonly);
         }
 
         return array_merge(...$objects);
