@@ -9,9 +9,6 @@ use Icinga\Module\Netboximport\Api;
 
 class ImportSource extends ImportSourceHook {
     private $api;
-    private $resolve_properties = [
-        "cluster",
-    ];
 
     private static function endsWith($haystack, $needle) {
         $length = strlen($needle);
@@ -19,25 +16,26 @@ class ImportSource extends ImportSourceHook {
     }
 
     // stolen from https://stackoverflow.com/a/9546235/2486196
-    function flattenArray($prefix, $array) {
+    function flattenArray($prefix, $array, $autoflatten_elements = array(), $flattenNested = false, $flattenDelimiter = "__") {
         $result = [];
 
         foreach ($array as $key => $value) {
-            if (is_object($value))
+            if (is_object($value)) {
                 $value = get_object_vars($value);
+            }
 
-           if (is_array($value)) {
-               $result[$key] = $value;
-               continue;
-           }
-
-          $result[$prefix . $key] = $value;
+            //Flatten nested arrays if key is in $autoflatten_elements or if flattenNested is true
+            if(is_array($value) && ($flattenNested || in_array($key, $autoflatten_elements))) {
+              $result = array_merge($result, $this->flattenArray($prefix . $key . $flattenDelimiter, $value, $autoflatten_elements,true));
+            } else {
+              $result[$prefix . $key] = $value;
+            }
         }
 
         return $result;
     }
 
-    private function fetchObjects($ressource, $activeOnly, $additionalKeysCallback = null) {
+    private function fetchObjects($ressource, $activeOnly, $autoflatten_elements, $additionalKeysCallback = null) {
         $objs = $this->api->g($ressource);
 
        //Filter only active objects if setting is set
@@ -49,7 +47,7 @@ class ImportSource extends ImportSourceHook {
         });
 
 
-        $objs = array_map(function ($o) use ($additionalKeysCallback) {
+        $objs = array_map(function ($o) use ($additionalKeysCallback, $autoflatten_elements) {
            //Resolve additional properties
             foreach ($this->resolve_properties as $prop) {
                 if (@$o->$prop !== null) {
@@ -57,20 +55,22 @@ class ImportSource extends ImportSourceHook {
                 }
             }
 
-            $o = $this->flattenArray('', $o);
+            $o = (array) $o;
 
+            //Get matching objects from $additionalKeysCallback and merge them into the object
             if(is_callable($additionalKeysCallback)) {
                 $keys = $additionalKeysCallback($o['id']);
+
+                array_map(function ($key) use ($keys,$autoflatten_elements) {
+                  if(in_array($key, $autoflatten_elements)) {
+                      $keys[$key] = $this->flattenArray($key, $keys[$key],$autoflatten_elements,true);
+                  }
+                },array_keys($keys));
 
                 $o = array_merge($o, $keys);
             }
 
-/*            $o = array_filter($o, function ($key) {
-                return
-                    !$this->endsWith($key, '__id') &&
-                    !$this->endsWith($key, '__url')
-                ;
-            }, ARRAY_FILTER_USE_KEY);*/
+            $o = $this->flattenArray('', $o,$autoflatten_elements);
 
             return (object) $o;
         }, $objs);
@@ -78,13 +78,15 @@ class ImportSource extends ImportSourceHook {
         return $objs;
     }
 
-    private function fetchHosts($url, $type, $activeonly) {
-        $hosts = $this->fetchObjects($url, $activeonly, function ($id) use ($type) {
+    private function fetchHosts($url, $type, $activeonly, $autoflatten_elements) {
+        $hosts = $this->fetchObjects($url, $activeonly, $autoflatten_elements, function ($id) use ($type, $autoflatten_elements) {
+          $interfaces = $this->flattenArray('', $this->interfaces[$type][$id] ?? [],array(), in_array("interfaces", $autoflatten_elements));
+          $services = $this->flattenArray('', $this->services[$type][$id] ?? [], array(), in_array("services", $autoflatten_elements));
 
-            $children =  $this->flattenArray('', [
-                'interfaces' => $this->interfaces[$type][$id] ?? [],
-                'services' => $this->services[$type][$id] ?? []
-            ]);
+            $children =  [
+                'interfaces' => $interfaces,
+                'services' => $services
+            ];
 
            return $children;
         });
@@ -101,8 +103,6 @@ class ImportSource extends ImportSourceHook {
         $owner_types = array_keys($owners);
 
         foreach($services as $service) {
-            $servicename = strtolower($service->name);
-
             foreach($owner_types as $ot) {
                 if ($service->$ot) {
                     $owner_type = $ot;
@@ -203,11 +203,24 @@ class ImportSource extends ImportSourceHook {
             'description' => $form->translate('only load objects with status "active" (as opposed to "planned" or "offline")'),
         ));
 
+        $form->addElement('text','autoflattenelements', array(
+             'label'       => $form->translate('Flatten nested objects'),
+             'description' => $form->translate('which keys should be automatically be flattened (comma seperated)'),
+            'value'       => 'interfaces,custom_fields',
+         ));
+
        $form->addElement('text','serviceelements', array(
             'label'       => $form->translate('Services Elements'),
             'description' => $form->translate('which elements of Services should be imported (comma seperated)'),
            'value'       => 'name,port,protocol,ipaddresses,description,custom_fields',
         ));
+
+        $form->addElement('text','resolveproperties', array(
+             'label'       => $form->translate('Properties to resolve'),
+             'description' => $form->translate('some nested objects can be resolved instead of just referenced [e.g. cluster ]'
+                                . 'you can specify which ones you want to resolve(comma seperated)'),
+            'value'       => 'cluster',
+         ));
     }
 
     public function fetchData() {
@@ -216,6 +229,8 @@ class ImportSource extends ImportSourceHook {
         $activeonly = $this->getSetting('activeonly') === 'y';
 
         $service_elements = explode(",",$this->getSetting('serviceelements'));
+        $autoflatten_elements = explode(",",$this->getSetting('autoflattenelements'));
+        $this->resolve_properties = explode(",",$this->getSetting('resolveproperties'));
 
         $this->api = new Api($baseurl, $apitoken);
         $this->interfaces = $this->fetchInterfaces();
@@ -224,11 +239,11 @@ class ImportSource extends ImportSourceHook {
         $objects = [];
 
         if($this->getSetting('importdevices') === 'y') {
-            $objects[] = $this->fetchHosts('dcim/devices', 'device', $activeonly);
+            $objects[] = $this->fetchHosts('dcim/devices', 'device', $activeonly, $autoflatten_elements);
         }
 
         if($this->getSetting('importvirtualmachines') === 'y') {
-            $objects[] = $this->fetchHosts('virtualization/virtual-machines', 'virtual_machine', $activeonly);
+            $objects[] = $this->fetchHosts('virtualization/virtual-machines', 'virtual_machine', $activeonly, $autoflatten_elements);
         }
 
         return array_merge(...$objects);
