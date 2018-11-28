@@ -34,40 +34,32 @@ before configuring a netbox import.
 ## Data Format
 
 This plugin pulls all available objects with all their fields into icinga. Since
-the data in netbox mostly consists of nested objects, all values are flatted
-first:
+the data in netbox mostly consists of nested objects, you will either have to autoflatten (default for custom_fields and interfaces) the elements or you have to apply the "Get specific Array Element" modifier to deconstruct the objects.
+and access the object elements:
 
+primary_ip4:
 ```yml
 {
-  "id": 39,
-  "name": "3c09",
-  "display_name": "3c09",
-  "device_type": {
-      "id": 19,
-      "url": "https://netbox.example.com/api/dcim/device-types/19/",
-      "manufacturer": {
-          "id": 12,
-          "url": "https://netbox.example.com/api/dcim/manufacturers/12/",
-          "name": "3COM",
-          "slug": "3com"
-      },
-      "model": "Baseline 2250-SPF-Plus",
-      "slug": "baseline-2250-spf-plus"
-  },
+  address: "192.168.0.1/24",
+  family: 4,
+  id: 1,
+  url: "<NETBOX URL>"
 }
 ```
 
+Apply modifier to export address field:
+
+![Import source - Modifiers](doc/screenshot/import-modifier-1.png)
+
+Because Icinga2 does not like the format Netbox uses (/subnet appended to address), we need to strip this away with another modifier:
+
+![Import source - Modifiers](doc/screenshot/import-modifier-2.png)
+
+Now you can access the primary_ipv4 directly as a property
 :arrow_right:
 
 ```yml
-id: 39
-name: 3c09
-display_name: 3c09
-device_type__id: 19
-device_type__url: https://netbox.example.com/api/dcim/device-types/19/
-device_type__manufacturer__id: 12
-device_type__manufacturer__url: https://netbox.example.com/api/dcim/manufacturers/12/
-...
+ipv4_address: "192.168.0.1"
 ```
 
 A list of all possible fields can be seen in the "Preview" of your Import Source,
@@ -79,7 +71,7 @@ In some cases additional fields are provided:
 * `cluster` is replaced by the actual cluster object as returned by the API,
   instead of just the id/name.
 * `interfaces` is added, so configured IP addresses can be reused in icinga
-* all `id` and `url` sub-keys are removed to de-clutter the list.
+* `services` is added, so configured services can be reused in icinga
 
 ## Acknowledgements
 
