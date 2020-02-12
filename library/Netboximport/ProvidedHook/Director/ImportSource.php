@@ -36,22 +36,22 @@ class ImportSource extends ImportSourceHook {
     }
 
     private function fetchObjects($ressource, $activeOnly, $autoflatten_elements, $additionalKeysCallback = null) {
-        $objs = $this->api->g($ressource);
+        $objects = $this->api->get($ressource);
 
        //Filter only active objects if setting is set
-        $objs = array_filter($objs, function ($o) use ($activeOnly) {
+        $objects = array_filter($objects, function ($o) use ($activeOnly) {
             return
-              (!$activeOnly || @$o->status->value === 1)
+              (!$activeOnly || @$o->status->id === 1)
               && @$o->name
             ;
         });
 
 
-        $objs = array_map(function ($o) use ($additionalKeysCallback, $autoflatten_elements) {
+        $objects = array_map(function ($o) use ($additionalKeysCallback, $autoflatten_elements) {
            //Resolve additional properties
             foreach ($this->resolve_properties as $prop) {
                 if (@$o->$prop !== null) {
-                    $o->$prop = $this->api->g($o->$prop->url);
+                    $o->$prop = $this->api->get($o->$prop->url);
                 }
             }
 
@@ -62,26 +62,30 @@ class ImportSource extends ImportSourceHook {
                 $keys = $additionalKeysCallback($o['id']);
 
                 array_map(function ($key) use ($keys,$autoflatten_elements) {
-                  if(in_array($key, $autoflatten_elements)) {
-                      $keys[$key] = $this->flattenArray($key, $keys[$key],$autoflatten_elements,true);
-                  }
-                },array_keys($keys));
+                    if(in_array($key, $autoflatten_elements)) {
+                        $keys[$key] = $this->flattenArray($key, $keys[$key],$autoflatten_elements,true);
+                    }
+                },
+                array_keys($keys));
 
                 $o = array_merge($o, $keys);
+                
             }
 
             $o = $this->flattenArray('', $o,$autoflatten_elements);
 
             return (object) $o;
-        }, $objs);
+            
+        }, $objects);
 
-        return $objs;
+        return $objects;
+        
     }
 
     private function fetchHosts($url, $type, $activeonly, $autoflatten_elements) {
         $hosts = $this->fetchObjects($url, $activeonly, $autoflatten_elements, function ($id) use ($type, $autoflatten_elements) {
-          $interfaces = $this->flattenArray('', $this->interfaces[$type][$id] ?? [],array(), in_array("interfaces", $autoflatten_elements));
-          $services = $this->flattenArray('', $this->services[$type][$id] ?? [], array(), in_array("services", $autoflatten_elements));
+            $interfaces = $this->flattenArray('', $this->interfaces[$type][$id] ?? [],array(), in_array("interfaces", $autoflatten_elements));
+            $services = $this->flattenArray('', $this->services[$type][$id] ?? [], array(), in_array("services", $autoflatten_elements));
 
             $children =  [
                 'interfaces' => $interfaces,
@@ -89,17 +93,21 @@ class ImportSource extends ImportSourceHook {
             ];
 
            return $children;
+            
         });
+        
         return $hosts;
+        
     }
 
     private function fetchServices($allowedServiceElements) {
-        $services = $this->api->g('ipam/services');
+        $services = $this->api->get('ipam/services');
 
         $owners = [
             'device' => [],
             'virtual_machine' => [],
         ];
+        
         $owner_types = array_keys($owners);
 
         foreach($services as $service) {
@@ -112,27 +120,30 @@ class ImportSource extends ImportSourceHook {
             }
 
             if(!array_key_exists($owner_id,$owners[$owner_type])) {
-              $owners[$owner_type][$owner_id] = array();
+                $owners[$owner_type][$owner_id] = array();
             }
 
            $service = array_filter((array) $service, function($key) use ($allowedServiceElements) {
-                        return in_array($key, $allowedServiceElements);
-                }, ARRAY_FILTER_USE_KEY
+               return in_array($key, $allowedServiceElements);
+               }, ARRAY_FILTER_USE_KEY
             );
 
             array_push($owners[$owner_type][$owner_id], (array) $service);
+            
         }
 
         return $owners;
+        
     }
 
     private function fetchInterfaces() {
-        $ips = $this->api->g('ipam/ip-addresses');
+        $ips = $this->api->get('ipam/ip-addresses');
 
         $owners = [
             'device' => [],
             'virtual_machine' => [],
         ];
+        
         $owner_types = array_keys($owners);
 
         foreach($ips as $ip) {
@@ -164,69 +175,68 @@ class ImportSource extends ImportSourceHook {
                         )
                     )
                 ]
-            );
+             );
 
         }
 
         return $owners;
+    
     }
 
     public static function addSettingsFormFields(QuickForm $form) {
         $form->addElement('text', 'baseurl', array(
             'label'       => $form->translate('Base URL'),
             'required'    => true,
-            'description' => $form->translate(
-                'API url for your instance, e.g. https://netbox.example.com/api'
-            )
+            'description' => $form->translate('API url for your instance, e.g. https://netbox.example.com/api')
         ));
 
         $form->addElement('text', 'apitoken', array(
             'label'       => $form->translate('API-Token'),
             'required'    => true,
-            'description' => $form->translate(
-                '(readonly) API token. See https://netbox.example.com/user/api-tokens/'
-            )
+            'description' => $form->translate('(readonly) API token. See https://netbox.example.com/user/api-tokens/')
         ));
 
         $form->addElement('YesNo', 'importdevices', array(
             'label'       => $form->translate('Import devices'),
-            'description' => $form->translate('import physical devices (dcim/devices in netbox).'),
+            'description' => $form->translate('Import physical devices (dcim/devices in netbox).')
         ));
 
         $form->addElement('YesNo', 'importvirtualmachines', array(
             'label'       => $form->translate('Import virtual machines'),
-            'description' => $form->translate('import virtual machines (virtualization/virtual-machines in netbox).'),
+            'description' => $form->translate('Import virtual machines (virtualization/virtual-machines in netbox).'),
         ));
 
         $form->addElement('YesNo', 'activeonly', array(
             'label'       => $form->translate('Import active objects only'),
-            'description' => $form->translate('only load objects with status "active" (as opposed to "planned" or "offline")'),
+            'description' => $form->translate('Only load objects with status "active" (as opposed to "planned" or "offline")')
         ));
 
         $form->addElement('text','autoflattenelements', array(
-             'label'       => $form->translate('Flatten nested objects'),
-             'description' => $form->translate('which keys should be automatically be flattened (comma seperated)'),
+            'label'       => $form->translate('Flatten nested objects'),
+            'description' => $form->translate('Which keys should be automatically be flattened (comma seperated)'),
             'value'       => 'interfaces,custom_fields',
-         ));
+        ));
 
-       $form->addElement('text','serviceelements', array(
+        $form->addElement('text','serviceelements', array(
             'label'       => $form->translate('Services Elements'),
-            'description' => $form->translate('which elements of Services should be imported (comma seperated)'),
-           'value'       => 'name,port,protocol,ipaddresses,description,custom_fields',
+            'description' => $form->translate('Which elements of Services should be imported (comma seperated)'),
+            'value'       => 'name,port,protocol,ipaddresses,description,custom_fields',
         ));
 
         $form->addElement('text','resolveproperties', array(
-             'label'       => $form->translate('Properties to resolve'),
-             'description' => $form->translate('some nested objects can be resolved instead of just referenced [e.g. cluster ]'
-                                . 'you can specify which ones you want to resolve(comma seperated)'),
+            'label'       => $form->translate('Properties to resolve'),
+            'description' => $form->translate('Some nested objects can be resolved instead of just referenced e.g. [ cluster,interfaces ] (comma seperated)'),
             'value'       => 'cluster',
-         ));
+        ));
     }
 
     public function fetchData() {
         $baseurl = $this->getSetting('baseurl');
         $apitoken = $this->getSetting('apitoken');
-        $activeonly = $this->getSetting('activeonly') === 'y';
+        
+        if ($this->getSetting('activeonly') === 'y') {
+            $activeonly = 'active';
+        }
 
         $service_elements = explode(",",$this->getSetting('serviceelements'));
         $autoflatten_elements = explode(",",$this->getSetting('autoflattenelements'));
@@ -247,6 +257,7 @@ class ImportSource extends ImportSourceHook {
         }
 
         return array_merge(...$objects);
+        
     }
 
     public function listColumns() {
