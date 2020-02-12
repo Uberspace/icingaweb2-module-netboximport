@@ -61,7 +61,7 @@ class Api {
         }
     }
 
-    public function g($resource, $filter=array(), $cache=TRUE) {
+    public function get($resource, $filter=array(), $cache=TRUE) {
         $cache_key = sha1($resource . json_encode($filter));
 
         if (isset($this->cache[$cache_key])) {
