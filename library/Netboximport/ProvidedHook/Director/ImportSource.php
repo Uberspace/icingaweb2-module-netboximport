@@ -39,47 +39,44 @@ class ImportSource extends ImportSourceHook {
         $objects = $this->api->get($ressource);
 
        //Filter only active objects if setting is set
-        $objects = array_filter($objects, function ($o) use ($activeOnly) {
+        $objects = array_filter($objects, function ($object) use ($activeOnly) {
             return
-              (!$activeOnly || @$o->status->id === 1)
-              && @$o->name
+              // special thanks to netbox that they changed this lovely thing for a THIRD TIME
+              (!$activeOnly || @$object->status->value === "active")
+              && @$object->name
             ;
         });
 
-
-        $objects = array_map(function ($o) use ($additionalKeysCallback, $autoflatten_elements) {
-           //Resolve additional properties
-            foreach ($this->resolve_properties as $prop) {
-                if (@$o->$prop !== null) {
-                    $o->$prop = $this->api->get($o->$prop->url);
+        $objects = array_map(function ($object) use ($additionalKeysCallback, $autoflatten_elements) {
+            //Resolve additional properties
+            foreach ($this->resolve_properties as $property) {
+                if (@$object->$property !== null) {
+                    // special thanks to netbox that they for whatever reason reference on the full url including base url now
+                    preg_match('/.*\/api\/(.*)/',$object->$property->url,$url);
+                    $object->$property = $this->api->get($url[1]);
                 }
             }
 
-            $o = (array) $o;
+            $object = (array) $object;
 
             //Get matching objects from $additionalKeysCallback and merge them into the object
             if(is_callable($additionalKeysCallback)) {
-                $keys = $additionalKeysCallback($o['id']);
+                $keys = $additionalKeysCallback($object['id']);
 
                 array_map(function ($key) use ($keys,$autoflatten_elements) {
                     if(in_array($key, $autoflatten_elements)) {
-                        $keys[$key] = $this->flattenArray($key, $keys[$key],$autoflatten_elements,true);
+                        $keys[$key] = $this->flattenArray($key, $keys[$key], $autoflatten_elements, true);
                     }
                 },
                 array_keys($keys));
-
-                $o = array_merge($o, $keys);
-                
+                $object = array_merge($object, $keys);
             }
+            $object = $this->flattenArray('', $object, $autoflatten_elements);
 
-            $o = $this->flattenArray('', $o,$autoflatten_elements);
-
-            return (object) $o;
-            
+            return (object) $object;
         }, $objects);
 
         return $objects;
-        
     }
 
     private function fetchHosts($url, $type, $activeonly, $autoflatten_elements) {
@@ -93,34 +90,32 @@ class ImportSource extends ImportSourceHook {
             ];
 
            return $children;
-            
         });
         
         return $hosts;
-        
     }
 
     private function fetchServices($allowedServiceElements) {
         $services = $this->api->get('ipam/services');
 
-        $owners = [
+        $types = [
             'device' => [],
             'virtual_machine' => [],
         ];
         
-        $owner_types = array_keys($owners);
+        $object_types = array_keys($types);
 
         foreach($services as $service) {
-            foreach($owner_types as $ot) {
-                if ($service->$ot) {
-                    $owner_type = $ot;
-                    $owner_id = $service->$ot->id;
+            foreach($object_types as $object_type) {
+                if ($service->$object_type) {
+                    $reference_object_type = $object_type;
+                    $reference_object_id = $service->$reference_object_type->id;
                     break;
                 }
             }
 
-            if(!array_key_exists($owner_id,$owners[$owner_type])) {
-                $owners[$owner_type][$owner_id] = array();
+            if(!array_key_exists($reference_object_id,$types[$reference_object_type])) {
+                $types[$reference_object_type][$reference_object_id] = array();
             }
 
            $service = array_filter((array) $service, function($key) use ($allowedServiceElements) {
@@ -128,59 +123,61 @@ class ImportSource extends ImportSourceHook {
                }, ARRAY_FILTER_USE_KEY
             );
 
-            array_push($owners[$owner_type][$owner_id], (array) $service);
-            
+            array_push($types[$reference_object_type][$reference_object_id], (array) $service);            
         }
 
-        return $owners;
-        
+        return $types;
     }
 
     private function fetchInterfaces() {
         $ips = $this->api->get('ipam/ip-addresses');
 
-        $owners = [
-            'device' => [],
-            'virtual_machine' => [],
-        ];
-        
-        $owner_types = array_keys($owners);
-
         foreach($ips as $ip) {
-            if(!$ip->interface) {
+
+            if(!$ip->assigned_object) {
                 continue;
             }
 
-            $ifname = strtolower($ip->interface->name);
-
-            if($ifname === 'lo') {
-                continue;
-            }
-
-            foreach($owner_types as $ot) {
-                if ($ip->interface->$ot) {
-                    $owner_type = $ot;
-                    $owner_id = $ip->interface->$ot->id;
-                    break;
+            if ($ip->assigned_object->name) {
+                if ($ip->assigned_object->name === 'lo') { 
+                    continue;
+                } else {
+                    $assigned_object_name = strtolower($ip->assigned_object->name);
                 }
             }
 
-            $owners[$owner_type][$owner_id] = array_merge(
-                $owners[$owner_type][$owner_id] ?? [],
-                [
-                    $ifname => array_merge(
-                        $owners[$owner_type][$owner_id][$ifname] ?? [],
-                        array(
-                            $ip->address
-                        )
-                    )
-                ]
-             );
+            switch ($ip->assigned_object_type) {
+                case 'dcim.interface':
+                    $reference_object_type = 'device';
+                    break;
+                case 'virtualization.vminterface':
+                    $reference_object_type = 'virtual_machine';
+                    break;
+            }
 
+            if ($reference_object_type) {
+                if ($ip->assigned_object->$reference_object_type->id) {
+                    $reference_object_id = $ip->assigned_object->$reference_object_type->id;
+                }
+            }
+
+            if ($reference_object_type && $reference_object_id && $assigned_object_name) {
+                $interfaces[$reference_object_type][$reference_object_id] = array_merge(
+                    $interfaces[$reference_object_type][$reference_object_id] ?? [],
+                    [
+                        $assigned_object_name => array_merge(
+                            $interfaces[$reference_object_type][$reference_object_id][$assigned_object_name] ?? [],
+                            array(
+                                $ip->address
+                            )
+                        )
+                    ]
+                );
+
+            }
         }
 
-        return $owners;
-    
+        return $interfaces;    
     }
 
     public static function addSettingsFormFields(QuickForm $form) {
@@ -257,7 +254,7 @@ class ImportSource extends ImportSourceHook {
         }
 
         return array_merge(...$objects);
-        
+
     }
 
     public function listColumns() {
@@ -268,4 +265,5 @@ class ImportSource extends ImportSourceHook {
     public function getName() {
         return 'Netbox';
     }
+
 }
