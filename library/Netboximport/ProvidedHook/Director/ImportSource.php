@@ -131,53 +131,98 @@ class ImportSource extends ImportSourceHook {
 
     private function fetchInterfaces() {
         $ips = $this->api->get('ipam/ip-addresses');
+        $owners = [
+            'device' => [],
+            'virtual_machine' => [],
+        ];
+        
+        $owner_types = array_keys($owners);
 
         foreach($ips as $ip) {
-
-            if(!$ip->assigned_object) {
-                continue;
-            }
-
-            if ($ip->assigned_object->name) {
-                if ($ip->assigned_object->name === 'lo') { 
+            if(property_exists($ip, 'interface')) {
+                if (!$ip->interface) {
                     continue;
-                } else {
-                    $assigned_object_name = strtolower($ip->assigned_object->name);
                 }
-            }
+                # old code
+                $ifname = strtolower($ip->interface->name);
 
-            switch ($ip->assigned_object_type) {
-                case 'dcim.interface':
-                    $reference_object_type = 'device';
-                    break;
-                case 'virtualization.vminterface':
-                    $reference_object_type = 'virtual_machine';
-                    break;
-            }
-
-            if ($reference_object_type) {
-                if ($ip->assigned_object->$reference_object_type->id) {
-                    $reference_object_id = $ip->assigned_object->$reference_object_type->id;
+                if($ifname === 'lo') {
+                    continue;
                 }
-            }
-
-            if ($reference_object_type && $reference_object_id && $assigned_object_name) {
-                $interfaces[$reference_object_type][$reference_object_id] = array_merge(
-                    $interfaces[$reference_object_type][$reference_object_id] ?? [],
+    
+                foreach($owner_types as $ot) {
+                    if ($ip->interface->$ot) {
+                        $owner_type = $ot;
+                        $owner_id = $ip->interface->$ot->id;
+                        break;
+                    }
+                }
+    
+                $owners[$owner_type][$owner_id] = array_merge(
+                    $owners[$owner_type][$owner_id] ?? [],
                     [
-                        $assigned_object_name => array_merge(
-                            $interfaces[$reference_object_type][$reference_object_id][$assigned_object_name] ?? [],
+                        $ifname => array_merge(
+                            $owners[$owner_type][$owner_id][$ifname] ?? [],
                             array(
                                 $ip->address
                             )
                         )
                     ]
-                );
-
+                 );
+            }
+            elseif (property_exists($ip, 'assigned_object')) {
+                if (!$ip->assigned_object) {
+                    continue;
+                }
+                # new code
+                if ($ip->assigned_object->name) {
+                    if ($ip->assigned_object->name === 'lo') { 
+                        continue;
+                    } else {
+                        $assigned_object_name = strtolower($ip->assigned_object->name);
+                    }
+                }
+    
+                switch ($ip->assigned_object_type) {
+                    case 'dcim.interface':
+                        $reference_object_type = 'device';
+                        break;
+                    case 'virtualization.vminterface':
+                        $reference_object_type = 'virtual_machine';
+                        break;
+                }
+    
+                if ($reference_object_type) {
+                    if ($ip->assigned_object->$reference_object_type->id) {
+                        $reference_object_id = $ip->assigned_object->$reference_object_type->id;
+                    }
+                }
+    
+                if ($reference_object_type && $reference_object_id && $assigned_object_name) {
+                    $interfaces[$reference_object_type][$reference_object_id] = array_merge(
+                        $interfaces[$reference_object_type][$reference_object_id] ?? [],
+                        [
+                            $assigned_object_name => array_merge(
+                                $interfaces[$reference_object_type][$reference_object_id][$assigned_object_name] ?? [],
+                                array(
+                                    $ip->address
+                                )
+                            )
+                        ]
+                    );
+    
+                }
+            }
+            else {
+                continue;
             }
         }
 
-        return $interfaces;    
+        if (isset($interfaces)) {
+            return $interfaces;
+        } else {
+            return $owners;
+        }
     }
 
     public static function addSettingsFormFields(QuickForm $form) {
@@ -233,6 +278,8 @@ class ImportSource extends ImportSourceHook {
         
         if ($this->getSetting('activeonly') === 'y') {
             $activeonly = 'active';
+        } else {
+            $activeonly = '';
         }
 
         $service_elements = explode(",",$this->getSetting('serviceelements'));
