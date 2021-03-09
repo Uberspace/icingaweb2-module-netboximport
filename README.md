@@ -73,6 +73,14 @@ In some cases additional fields are provided:
 * `interfaces` is added, so configured IP addresses can be reused in icinga
 * `services` is added, so configured services can be reused in icinga
 
+### Tag split delimiter
+A Tag in netbox is only one value. But if your tags are imported by different hyperscaler, you have often a key value pair. So if you import this key value pair into netbox you have to chose a delimiter. In our case tags a are like:
+````
+thisisatag::true
+````
+To Work with the key and the value in icinga2, you need a json hash. If you have a different delimiter, you can set this herre.
+If you have no delimiter, you can ignore this field.
+
 ## Acknowledgements
 
 The general structure and a few tips were lifted from [icingaweb2-module-fileshipper](https://github.com/Icinga/icingaweb2-module-fileshipper).
