@@ -91,7 +91,7 @@ class ImportSource extends ImportSourceHook {
 
            return $children;
         });
-        
+
         return $hosts;
     }
 
@@ -232,6 +232,12 @@ class ImportSource extends ImportSourceHook {
             'description' => $form->translate('API url for your instance, e.g. https://netbox.example.com/api')
         ));
 
+        $form->addElement('checkbox', 'ignore_ssl_verification', array(
+            'label'       => $form->translate('Ignore SSL Verification'),
+            'required'    => false,
+            'description' => $form->translate('Ignore SSL Verification')
+        ));
+
         $form->addElement('text', 'apitoken', array(
             'label'       => $form->translate('API-Token'),
             'required'    => true,
@@ -270,12 +276,20 @@ class ImportSource extends ImportSourceHook {
             'description' => $form->translate('Some nested objects can be resolved instead of just referenced e.g. [ cluster,interfaces ] (comma seperated)'),
             'value'       => 'cluster',
         ));
+
+        $form->addElement('text','tag_split_delimiter', array(
+            'label'       => $form->translate('Tag Split Delimiter'),
+            'description' => $form->translate('Set the delimiter to split your tag in key and value. For more details: README.md'),
+            'value'       => '',
+        ));
     }
 
     public function fetchData() {
         $baseurl = $this->getSetting('baseurl');
+        $ignore_ssl_verification = $this->getSetting('ignore_ssl_verification');
         $apitoken = $this->getSetting('apitoken');
-        
+        $tag_split_delimiter = $this->getSetting('tag_split_delimiter');
+
         if ($this->getSetting('activeonly') === 'y') {
             $activeonly = 'active';
         } else {
@@ -286,7 +300,7 @@ class ImportSource extends ImportSourceHook {
         $autoflatten_elements = explode(",",$this->getSetting('autoflattenelements'));
         $this->resolve_properties = explode(",",$this->getSetting('resolveproperties'));
 
-        $this->api = new Api($baseurl, $apitoken);
+        $this->api = new Api($baseurl, $apitoken, $ignore_ssl_verification);
         $this->interfaces = $this->fetchInterfaces();
         $this->services = $this->fetchServices($service_elements);
 
@@ -300,8 +314,35 @@ class ImportSource extends ImportSourceHook {
             $objects[] = $this->fetchHosts('virtualization/virtual-machines', 'virtual_machine', $activeonly, $autoflatten_elements);
         }
 
-        return array_merge(...$objects);
+        $objects = array_merge(...$objects);
 
+        /*
+        I couldn't find the change in the netbox changelog but they changed that tags now returned as an object and no longer as an array.
+        Furthermore I added the posibillity to split tags to a key value pair.
+        */
+        foreach ($objects as $object) {
+            $host_tags = array();
+            foreach ($object->tags as $tags) {
+                if ($tag_split_delimiter) {
+                    $tag = explode($tag_split_delimiter, $tags->name);
+                    if (count($tag) > 1 ) {
+                        $key = $tag[0];
+                        $value = $tag[1];
+                    } else {
+                        $key = $tag[0];
+                        $value = "true";
+                    }
+
+                    $host_tags[$key] = $value;
+                } else {
+                    array_push($host_tags, $tags->name);
+                }
+
+            $object->tags = $host_tags;
+            }
+        }
+
+        return $objects;
     }
 
     public function listColumns() {
