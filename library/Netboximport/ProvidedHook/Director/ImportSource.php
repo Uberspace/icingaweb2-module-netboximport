@@ -232,10 +232,10 @@ class ImportSource extends ImportSourceHook {
             'description' => $form->translate('API url for your instance, e.g. https://netbox.example.com/api')
         ));
 
-        $form->addElement('checkbox', 'ssl_verify', array(
-            'label'       => $form->translate('SSL Verify'),
+        $form->addElement('checkbox', 'ignore_ssl_verification', array(
+            'label'       => $form->translate('Ignore SSL Verification'),
             'required'    => false,
-            'description' => $form->translate('Verify SSL Certs')
+            'description' => $form->translate('Ignore SSL Verification')
         ));
 
         $form->addElement('text', 'apitoken', array(
@@ -286,7 +286,7 @@ class ImportSource extends ImportSourceHook {
 
     public function fetchData() {
         $baseurl = $this->getSetting('baseurl');
-        $ssl_verify = $this->getSetting('ssl_verify');
+        $ignore_ssl_verification = $this->getSetting('ignore_ssl_verification');
         $apitoken = $this->getSetting('apitoken');
         $tag_split_delimiter = $this->getSetting('tag_split_delimiter');
 
@@ -300,7 +300,7 @@ class ImportSource extends ImportSourceHook {
         $autoflatten_elements = explode(",",$this->getSetting('autoflattenelements'));
         $this->resolve_properties = explode(",",$this->getSetting('resolveproperties'));
 
-        $this->api = new Api($baseurl, $apitoken, $ssl_verify);
+        $this->api = new Api($baseurl, $apitoken, $ignore_ssl_verification);
         $this->interfaces = $this->fetchInterfaces();
         $this->services = $this->fetchServices($service_elements);
 

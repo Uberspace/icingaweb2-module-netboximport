@@ -3,9 +3,9 @@
 namespace Icinga\Module\Netboximport;
 
 class Api {
-    function __construct($baseurl, $apitoken, $ssl_verify) {
+    function __construct($baseurl, $apitoken, $ignore_ssl_verification) {
         $this->baseurl = rtrim($baseurl, '/') . '/';
-        $this->ssl_verify = $ssl_verify;
+        $this->ignore_ssl_verification = $ignore_ssl_verification;
         $this->apitoken = $apitoken;
         $this->cache = [];
     }
@@ -29,7 +29,7 @@ class Api {
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
 
         // If ssl_verify is set, check ssl certificate from netbox host
-        if ($this->ssl_verify === "0") {
+        if ($this->ignore_ssl_verification === "1") {
             curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
         }
 

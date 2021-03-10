@@ -78,11 +78,7 @@ A Tag in netbox is only one value. But if your tags are imported by different hy
 ````
 thisisatag::true
 ````
-<<<<<<< HEAD
 To Work with the key and the value in icinga2, you need a json hash. If you have a different delimiter, you can set this here.
-=======
-To Work with the key and the value in icinga2, you need a json hash. If you have a different delimiter, you can set this herre.
->>>>>>> af5452cf085b7b56cda9f87f53156cbbd00a12df
 If you have no delimiter, you can ignore this field.
 
 ## Acknowledgements
